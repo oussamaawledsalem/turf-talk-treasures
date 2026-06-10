@@ -131,18 +131,18 @@ function AuthPage() {
           </div>
         </div>
 
-        <div className="hidden md:flex items-center justify-center">
-          <div className="relative">
-            <div className="absolute -inset-10 rounded-full bg-gold/20 blur-3xl" />
-            <ImageSlot
-              src="/images/trophy.png"
-              alt="World Cup trophy"
-              slotName="trophy.png"
-              width="380px"
-              height="480px"
-              objectFit="contain"
-            />
-          </div>
+          <div className="hidden md:flex items-center justify-center">
+            <div className="relative">
+              <div className="absolute -inset-10 rounded-full bg-gold/20 blur-3xl" />
+              <ImageSlot
+  src="/messi.jpg"
+  alt="World Cup trophy"
+  slotName="trophy.png"
+  width="650px"
+  height="480px"
+  objectFit="cover"
+/>
+            </div>
         </div>
       </div>
     </div>

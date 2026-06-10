@@ -33,14 +33,14 @@ export function ImageSlot({
         <div className="text-[10px]">Drop your photo here</div>
       </div>
       <img
-        src={src}
-        alt={alt}
-        className="absolute inset-0 w-full h-full"
-        style={{ objectFit }}
-        onError={(e) => {
-          (e.currentTarget as HTMLImageElement).style.display = "none";
-        }}
-      />
+  src={src}
+  alt={alt}
+  className="absolute inset-0 w-full h-full"
+  style={{ objectFit, objectPosition: "center top" }}
+  onError={(e) => {
+    (e.currentTarget as HTMLImageElement).style.display = "none";
+  }}
+/>
     </div>
   );
 }
