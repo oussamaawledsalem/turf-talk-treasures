@@ -43,3 +43,14 @@ def decode_token(token: str) -> dict:
 
 def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
     return decode_token(token)
+
+
+def get_admin_user(token: str = Depends(oauth2_scheme)) -> dict:
+    """Dependency that requires the user to be an admin."""
+    user = decode_token(token)
+    if not user.get("is_admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    return user

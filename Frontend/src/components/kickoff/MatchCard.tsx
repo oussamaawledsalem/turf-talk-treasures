@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
-import { Lock, Pencil, MapPin } from "lucide-react";
+import { Lock, MapPin } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { MatchViewModel } from "@/routes/schedule";
 import { usePredictions } from "@/lib/predictions-context";
@@ -8,17 +8,34 @@ import { calculatePoints, matchHasStarted } from "@/lib/scoring";
 import { ScoreInput } from "./ScoreInput";
 
 export function MatchCard({ match }: { match: MatchViewModel }) {
-  const { predictions, setPrediction } = usePredictions();
+  const { predictions, setPrediction, removePrediction } = usePredictions();
   const existing = predictions[match.id];
   const started = matchHasStarted(match.date);
   const hasResult = !!match.result;
 
   const [scoreA, setScoreA] = useState(existing?.scoreA ?? 0);
   const [scoreB, setScoreB] = useState(existing?.scoreB ?? 0);
-  const [editing, setEditing] = useState(!existing && !started);
-  const [flash, setFlash] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // 5-second cancel countdown
+  const [cancelSecondsLeft, setCancelSecondsLeft] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!existing) { setCancelSecondsLeft(null); return; }
+    const lockedAt = existing.lockedAt;
+    const deadline = lockedAt + 5000;
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) { setCancelSecondsLeft(null); return; }
+
+    setCancelSecondsLeft(Math.ceil(remaining / 1000));
+    const interval = setInterval(() => {
+      const left = Math.ceil((deadline - Date.now()) / 1000);
+      if (left <= 0) { setCancelSecondsLeft(null); clearInterval(interval); }
+      else setCancelSecondsLeft(left);
+    }, 200);
+    return () => clearInterval(interval);
+  }, [existing?.lockedAt]);
 
   const points = calculatePoints(existing, match.result);
 
@@ -27,13 +44,18 @@ export function MatchCard({ match }: { match: MatchViewModel }) {
     setSaveError(null);
     try {
       await setPrediction(match.id, scoreA, scoreB);
-      setEditing(false);
-      setFlash(true);
-      setTimeout(() => setFlash(false), 1500);
     } catch {
       setSaveError("Failed to save. Try again.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const cancel = async () => {
+    try {
+      await removePrediction(match.id);
+    } catch {
+      setSaveError("Cancel failed — window may have expired.");
     }
   };
 
@@ -88,7 +110,44 @@ export function MatchCard({ match }: { match: MatchViewModel }) {
                 </div>
               )}
             </div>
-          ) : editing ? (
+          ) : existing ? (
+            // Locked — show prediction + optional cancel countdown
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <div className="eyebrow">Your pick (locked 🔒)</div>
+                  <div className="font-scoreboard text-3xl text-chalk">
+                    {match.teamA.name} {existing.scoreA} – {existing.scoreB} {match.teamB.name}
+                  </div>
+                </div>
+              </div>
+              {/* 5-second cancel window */}
+              {cancelSecondsLeft !== null && (
+                <motion.div
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="flex items-center gap-3"
+                >
+                  <div className="flex-1 h-1 rounded-full bg-turf-line overflow-hidden">
+                    <motion.div
+                      className="h-full bg-gold rounded-full"
+                      initial={{ width: "100%" }}
+                      animate={{ width: "0%" }}
+                      transition={{ duration: 5, ease: "linear" }}
+                    />
+                  </div>
+                  <button
+                    onClick={cancel}
+                    className="px-3 py-1.5 rounded-lg border border-red-card text-red-card text-sm hover:bg-red-card/10 transition"
+                  >
+                    Cancel ({cancelSecondsLeft}s)
+                  </button>
+                </motion.div>
+              )}
+            </div>
+          ) : (
+            // No prediction yet
             <div className="flex flex-col items-center gap-4">
               <div className="eyebrow">Your prediction</div>
               <div className="flex items-center gap-4">
@@ -96,9 +155,7 @@ export function MatchCard({ match }: { match: MatchViewModel }) {
                 <span className="font-display text-2xl text-chalk-dim">—</span>
                 <ScoreInput value={scoreB} onChange={setScoreB} />
               </div>
-              {saveError && (
-                <div className="text-red-card text-sm">{saveError}</div>
-              )}
+              {saveError && <div className="text-red-card text-sm">{saveError}</div>}
               <button
                 onClick={lock}
                 disabled={saving}
@@ -108,37 +165,8 @@ export function MatchCard({ match }: { match: MatchViewModel }) {
                 {saving ? "Saving..." : "Lock in prediction"}
               </button>
             </div>
-          ) : (
-            <div className="flex items-center justify-between gap-4 flex-wrap">
-              <div>
-                <div className="eyebrow">Your pick</div>
-                <div className="font-scoreboard text-3xl text-chalk">
-                  {match.teamA.name} {existing?.scoreA} – {existing?.scoreB} {match.teamB.name}
-                </div>
-              </div>
-              <button
-                onClick={() => setEditing(true)}
-                className="inline-flex items-center gap-2 rounded-lg border border-turf-line bg-turf-mid px-3 py-2 text-sm text-chalk hover:border-gold hover:text-gold transition"
-              >
-                <Pencil className="size-3" /> Edit
-              </button>
-            </div>
           )}
         </div>
-
-        {/* Flash toast */}
-        <AnimatePresence>
-          {flash && (
-            <motion.div
-              initial={{ opacity: 0, y: 0 }}
-              animate={{ opacity: 1, y: -20 }}
-              exit={{ opacity: 0 }}
-              className="absolute top-4 right-4 rounded-md bg-gold px-3 py-1 text-turf-deep font-display text-lg"
-            >
-              🔒 Locked in!
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     </motion.div>
   );
@@ -169,11 +197,9 @@ function ResultRow({
       </div>
       <div>
         <div className="eyebrow">Points</div>
-        <div
-          className={`font-scoreboard text-3xl ${
-            points === 3 ? "text-gold" : points === 1 ? "text-sky" : points === 0 ? "text-red-card" : "text-chalk-dim"
-          }`}
-        >
+        <div className={`font-scoreboard text-3xl ${
+          points === 3 ? "text-gold" : points === 1 ? "text-sky" : points === 0 ? "text-red-card" : "text-chalk-dim"
+        }`}>
           {points === null ? "—" : points === 3 ? "+3 🎉" : points === 1 ? "+1 ✅" : "0 ❌"}
         </div>
       </div>

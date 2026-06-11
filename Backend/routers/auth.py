@@ -31,13 +31,18 @@ def register(body: RegisterRequest):
         .execute()
     )
     user = result.data[0]
-    token = create_token({"sub": user["id"], "username": user["username"]})
+    token = create_token({
+        "sub":      user["id"],
+        "username": user["username"],
+        "is_admin": user.get("is_admin", False),
+    })
 
     return TokenResponse(
         access_token=token,
         user_id=user["id"],
         username=user["username"],
         avatar=user["avatar"],
+        is_admin=user.get("is_admin", False),
     )
 
 
@@ -62,11 +67,16 @@ def login(body: LoginRequest):
             detail="Invalid username or password"
         )
 
-    token = create_token({"sub": user["id"], "username": user["username"]})
+    token = create_token({
+        "sub":      user["id"],
+        "username": user["username"],
+        "is_admin": user.get("is_admin", False),
+    })
 
     return TokenResponse(
         access_token=token,
         user_id=user["id"],
         username=user["username"],
         avatar=user["avatar"],
+        is_admin=user.get("is_admin", False),
     )

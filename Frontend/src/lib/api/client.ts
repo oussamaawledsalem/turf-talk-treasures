@@ -1,4 +1,4 @@
-const BASE = "https://turf-talk-treasures.onrender.com";
+const BASE = "http://localhost:8000";
 
 function getToken(): string | null {
   return localStorage.getItem("wc26_token");
@@ -34,6 +34,7 @@ export type TokenResponse = {
   user_id: string;
   username: string;
   avatar: string;
+  is_admin?: boolean;
 };
 
 export const authApi = {
@@ -112,6 +113,7 @@ export type RankingRow = {
   user_id: string;
   username: string;
   avatar: string;
+  is_admin?: boolean;
   predicted: number;
   exact: number;
   correct: number;

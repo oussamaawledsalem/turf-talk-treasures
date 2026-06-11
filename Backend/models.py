@@ -20,6 +20,7 @@ class TokenResponse(BaseModel):
     user_id: str
     username: str
     avatar: str
+    is_admin: bool = False
 
 
 # ─── MATCHES ─────────────────────────────────────────────────────────────────

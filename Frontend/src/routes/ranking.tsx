@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Crown } from "lucide-react";
 import { motion } from "framer-motion";
@@ -106,9 +106,9 @@ function RankingPage() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-2xl">{r.avatar}</span>
-                <span className="font-display text-xl text-chalk tracking-wider">
+                <Link to="/player/$username" params={{ username: r.username }} className="font-display text-xl text-chalk tracking-wider hover:text-gold transition">
                   {r.username}
-                </span>
+                </Link>
                 {isMe && <span className="eyebrow text-gold ml-1">[YOU]</span>}
               </div>
               <div className="text-center font-scoreboard text-2xl text-gold">{r.exact}</div>
