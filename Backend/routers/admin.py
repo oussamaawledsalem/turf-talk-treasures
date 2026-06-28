@@ -4,6 +4,7 @@ from typing import Optional
 from database import supabase
 from security import get_admin_user
 from services.scoring import calculate_points
+from routers.matches import _format_match
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -17,6 +18,7 @@ class MatchUpdate(BaseModel):
     score_a: Optional[int] = None
     score_b: Optional[int] = None
     status: Optional[str] = None
+    match_date: Optional[str] = None
     team_a_name: Optional[str] = None
     team_b_name: Optional[str] = None
     team_a_code: Optional[str] = None
@@ -42,7 +44,7 @@ def get_all_matches_admin(_: dict = Depends(get_admin_user)):
         .order("match_date")
         .execute()
     )
-    return result.data
+    return [_format_match(row) for row in result.data]
 
 
 @router.post("/matches")
@@ -52,18 +54,22 @@ def create_knockout_match(
 ):
     """Create a new knockout match manually (teams known after group stage)."""
     row = {
-        "stage":      body.stage,
-        "match_date": body.match_date,
-        "team_a":     body.team_a,
-        "team_b":     body.team_b,
-        "venue":      body.venue,
-        "status":     "NS",
-        "score_a":    None,
-        "score_b":    None,
-        "api_id":     None,
+        "stage":       body.stage,
+        "match_date":  body.match_date,
+        "team_a_name": body.team_a.get("name"),
+        "team_a_code": body.team_a.get("code"),
+        "team_a_flag": body.team_a.get("flag"),
+        "team_b_name": body.team_b.get("name"),
+        "team_b_code": body.team_b.get("code"),
+        "team_b_flag": body.team_b.get("flag"),
+        "venue":       body.venue,
+        "status":      "NS",
+        "score_a":     None,
+        "score_b":     None,
+        "api_id":      None,
     }
     result = supabase.table("matches").insert(row).execute()
-    return result.data[0]
+    return _format_match(result.data[0])
 
 
 @router.patch("/matches/{match_id}/score")

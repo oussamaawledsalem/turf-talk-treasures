@@ -96,7 +96,38 @@ export const WC26_TEAMS: { name: string; code: string; flag: string }[] = [
   { name: "Uruguay", code: "UY", flag: "🇺🇾" },
   { name: "Uzbekistan", code: "UZ", flag: "🇺🇿" },
 ];
+// ── Real Round of 32 schedule (source of truth for dates/times) ──────────────
+// Tunisia local time (GMT+1, fixed offset) — converted to UTC when saved.
+const R32_SCHEDULE: { teams: [string, string]; date: string; time: string }[] = [
+  { teams: ["South Africa", "Canada"], date: "2026-06-28", time: "20:00" },
+  { teams: ["Brazil", "Japan"], date: "2026-06-29", time: "18:00" },
+  { teams: ["Germany", "Paraguay"], date: "2026-06-29", time: "21:30" },
+  { teams: ["Netherlands", "Morocco"], date: "2026-06-30", time: "02:00" },
+  { teams: ["Ivory Coast", "Norway"], date: "2026-06-30", time: "18:00" },
+  { teams: ["France", "Sweden"], date: "2026-06-30", time: "22:00" },
+  { teams: ["Mexico", "Ecuador"], date: "2026-07-01", time: "02:00" },
+  { teams: ["England", "DR Congo"], date: "2026-07-01", time: "17:00" },
+  { teams: ["Belgium", "Senegal"], date: "2026-07-01", time: "21:00" },
+  { teams: ["USA", "Bosnia and Herzegovina"], date: "2026-07-02", time: "01:00" },
+  { teams: ["Spain", "Austria"], date: "2026-07-02", time: "20:00" },
+  { teams: ["Portugal", "Croatia"], date: "2026-07-03", time: "00:00" },
+  { teams: ["Switzerland", "Algeria"], date: "2026-07-03", time: "04:00" },
+  { teams: ["Australia", "Egypt"], date: "2026-07-03", time: "19:00" },
+  { teams: ["Argentina", "Cabo Verde"], date: "2026-07-03", time: "23:00" },
+  { teams: ["Colombia", "Ghana"], date: "2026-07-04", time: "02:30" },
+];
 
+function tunisiaToUtcIso(date: string, time: string): string {
+  // Tunisia is fixed GMT+1, no DST
+  return new Date(`${date}T${time}:00+01:00`).toISOString();
+}
+
+function findScheduleEntry(teamAName: string, teamBName: string) {
+  return R32_SCHEDULE.find(
+    ({ teams: [x, y] }) =>
+      (x === teamAName && y === teamBName) || (x === teamBName && y === teamAName)
+  );
+}
 // ── Toast ─────────────────────────────────────────────────────────────────────
 
 type Toast = { msg: string; type: "ok" | "err" } | null;
@@ -684,44 +715,108 @@ function BracketTab({
     showToast("Bracket cleared.", "ok");
   };
 const saveToBackend = async () => {
-  // Group slots into pairs by their shared round/index, e.g. "r32_0"
+  // Group flat slot ids (r32_0_a, r32_0_b, ...) into pairs by round index
   const pairs: Record<string, { a?: Team; b?: Team }> = {};
-
   for (const [slotId, team] of Object.entries(bracket)) {
-    const match = slotId.match(/^(.+)_(a|b)$/);
-    if (!match) {
-      console.warn(`Skipping unrecognized slot id: ${slotId}`);
-      continue;
-    }
-    const [, baseId, side] = match;
+    const m = slotId.match(/^(r32)_(\d+)_(a|b)$/);
+    if (!m) continue; // only Round of 32 slots are pushed to backend for now
+    const [, , idx, side] = m;
+    const baseId = `r32_${idx}`;
     pairs[baseId] = pairs[baseId] || {};
     pairs[baseId][side as "a" | "b"] = team;
   }
 
+  if (Object.keys(pairs).length === 0) {
+    showToast("No Round of 32 slots filled in yet.", "err");
+    return;
+  }
+
+  // Pull existing Round of 32 matches so we update real fixtures, not create new ones
+  let r32Matches: ApiMatch[] = [];
+  try {
+    const allMatches = await adminApi.getAllMatches();
+    r32Matches = allMatches.filter((m) => m.stage === "Round of 32");
+  } catch (e: unknown) {
+    showToast((e as Error).message ?? "Failed to load existing matches.", "err");
+    return;
+  }
+
+  // Track which existing matches are still untouched (still TBD) so we can
+  // match purely by position as a fallback for fixtures not in R32_SCHEDULE.
+  const usedMatchIds = new Set<string>();
+  let updated = 0;
+  let skipped: string[] = [];
+
   try {
     for (const [baseId, { a, b }] of Object.entries(pairs)) {
       if (!a || !b) {
-        console.warn(`Skipping incomplete pair ${baseId}:`, { a, b });
+        skipped.push(`${baseId} (incomplete pair)`);
         continue;
       }
 
-      const created = await adminApi.createMatch({
-        stage: baseId, // e.g. "r32_0" — adjust if your backend expects a different stage label
-        match_date: new Date().toISOString(), // Placeholder date; adjust as needed
-        team_a: a,
-        team_b: b,
+      // 1. Try to find the real fixture + kickoff time by team name
+      const scheduleEntry = findScheduleEntry(a.name, b.name);
+
+      // 2. Find an existing TBD match to update — prefer one already matching
+      //    by date if we have a schedule entry, otherwise take the next
+      //    unused "Round of 32" TBD row.
+      let targetMatch: ApiMatch | undefined;
+
+      if (scheduleEntry) {
+        const targetIso = tunisiaToUtcIso(scheduleEntry.date, scheduleEntry.time);
+        targetMatch = r32Matches.find(
+          (m) =>
+            !usedMatchIds.has(m.id) &&
+            new Date(m.match_date).toISOString().slice(0, 10) === targetIso.slice(0, 10)
+        );
+      }
+
+      // Fallback: any unused TBD-team match, in original order
+      if (!targetMatch) {
+        targetMatch = r32Matches.find(
+          (m) => !usedMatchIds.has(m.id) && m.team_a.name === "TBD" && m.team_b.name === "TBD"
+        );
+      }
+
+      if (!targetMatch) {
+        skipped.push(`${a.name} vs ${b.name} (no available match slot found)`);
+        continue;
+      }
+
+      usedMatchIds.add(targetMatch.id);
+
+      await adminApi.updateMatch(targetMatch.id, {
+        team_a_name: a.name,
+        team_a_code: a.code,
+        team_a_flag: a.flag,
+        team_b_name: b.name,
+        team_b_code: b.code,
+        team_b_flag: b.flag,
+        ...(scheduleEntry
+          ? { match_date: tunisiaToUtcIso(scheduleEntry.date, scheduleEntry.time) }
+          : {}),
       });
 
-      console.log(`Saved ${baseId} → ${a.name} (${a.code}) vs ${b.name} (${b.code})`, created);
+      updated++;
+      console.log(
+        `Updated ${targetMatch.id} (${baseId}) → ${a.name} vs ${b.name}` +
+          (scheduleEntry ? ` @ ${scheduleEntry.date} ${scheduleEntry.time} (TN)` : " (date unchanged — not in schedule yet)")
+      );
     }
   } catch (e: unknown) {
     showToast((e as Error).message ?? "Failed to save bracket.", "err");
     return;
   }
 
-  showToast("Bracket saved to backend.", "ok");
-};
+  if (skipped.length) {
+    console.warn("Skipped:", skipped);
+    showToast(`Saved ${updated} matches. ${skipped.length} skipped — see console.`, "err");
+  } else {
+    showToast(`✅ Saved ${updated} matches to backend.`, "ok");
+  }
 
+  reload();
+};
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
       {/* Instructions */}

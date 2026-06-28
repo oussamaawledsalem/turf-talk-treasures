@@ -1,4 +1,4 @@
-const BASE = "https://turf-talk-treasures.onrender.com";
+const BASE = "http://localhost:8000";
 
 function getToken(): string | null {
   return localStorage.getItem("wc26_token");
@@ -139,10 +139,31 @@ export type SetResultPayload = {
   score_b: number;
 };
 
+export type UpdateMatchPayload = Partial<{
+  score_a: number;
+  score_b: number;
+  status: string;
+  match_date: string;
+  team_a_name: string;
+  team_b_name: string;
+  team_a_code: string;
+  team_b_code: string;
+  team_a_flag: string;
+  team_b_flag: string;
+}>;
+
 export const adminApi = {
+  getAllMatches: () => request<ApiMatch[]>("/admin/matches"),
+
   createMatch: (payload: CreateMatchPayload) =>
-    request<ApiMatch>("/admin/matches/", {
+    request<ApiMatch>("/admin/matches", {
       method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  updateMatch: (matchId: string, payload: UpdateMatchPayload) =>
+    request<ApiMatch>(`/admin/matches/${matchId}`, {
+      method: "PATCH",
       body: JSON.stringify(payload),
     }),
 
@@ -154,4 +175,4 @@ export const adminApi = {
 
   deleteMatch: (matchId: string) =>
     request<void>(`/admin/matches/${matchId}`, { method: "DELETE" }),
-};  
+};
