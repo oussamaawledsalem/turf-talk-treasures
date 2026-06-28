@@ -1,4 +1,4 @@
-const BASE = "http://localhost:8000";
+const BASE = "https://turf-talk-treasures.onrender.com";
 
 function getToken(): string | null {
   return localStorage.getItem("wc26_token");

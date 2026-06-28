@@ -13,7 +13,7 @@ export const Route = createFileRoute("/player/$username")({
   ),
 });
 
-const BASE = "http://localhost:8000";
+const BASE = "https://turf-talk-treasures.onrender.com";
 
 function getToken() {
   return localStorage.getItem("wc26_token");
