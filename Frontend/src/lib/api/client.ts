@@ -123,3 +123,35 @@ export type RankingRow = {
 export const rankingApi = {
   getAll: () => request<RankingRow[]>("/ranking/"),
 };
+
+// ── Admin ─────────────────────────────────────────────────────────────────────
+
+export type CreateMatchPayload = {
+  stage: string;
+  match_date: string;
+  team_a: { name: string; code: string; flag: string };
+  team_b: { name: string; code: string; flag: string };
+  venue?: string;
+};
+
+export type SetResultPayload = {
+  score_a: number;
+  score_b: number;
+};
+
+export const adminApi = {
+  createMatch: (payload: CreateMatchPayload) =>
+    request<ApiMatch>("/admin/matches/", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  setResult: (matchId: string, payload: SetResultPayload) =>
+    request<ApiMatch>(`/admin/matches/${matchId}/score`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+
+  deleteMatch: (matchId: string) =>
+    request<void>(`/admin/matches/${matchId}`, { method: "DELETE" }),
+};  

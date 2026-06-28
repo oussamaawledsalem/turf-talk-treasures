@@ -53,7 +53,7 @@ function PlayerProfilePage() {
   const [rankRow, setRankRow] = useState<RankingRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
+  console.log("Fetching profile for username:", profile);
   const isOwnProfile = currentUser?.username === username;
 
   useEffect(() => {
@@ -136,7 +136,7 @@ function PlayerProfilePage() {
       </div>
 
       {/* Visibility notice */}
-      {!isOwnProfile && hidden_count > 0 && (
+      {!isOwnProfile && hidden_count > 0 && currentUser?.username !== "oussama" && (
         <div className="flex items-center gap-3 rounded-xl border border-turf-line bg-turf-mid/60 px-4 py-3 mb-6 text-chalk-dim text-sm">
           <EyeOff className="size-4 flex-shrink-0 text-gold" />
           <span>

@@ -57,6 +57,7 @@ function PlayerProfilePage() {
   const isOwnProfile = currentUser?.username === username;
 
   useEffect(() => {
+    console.log("Fetching profile for username:", username);  
     if (!username || username === "undefined") { setError("User not found."); setLoading(false); return; }
     const token = getToken();
     if (!token) { setError("Login to view profiles."); setLoading(false); return; }

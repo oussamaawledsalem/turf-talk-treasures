@@ -25,6 +25,14 @@ class MatchUpdate(BaseModel):
     team_b_flag: Optional[str] = None
 
 
+class CreateMatchBody(BaseModel):
+    stage: str
+    match_date: str
+    team_a: dict
+    team_b: dict
+    venue: Optional[str] = None
+
+
 @router.get("/matches")
 def get_all_matches_admin(_: dict = Depends(get_admin_user)):
     """Get all matches with full details for admin panel."""
@@ -37,6 +45,27 @@ def get_all_matches_admin(_: dict = Depends(get_admin_user)):
     return result.data
 
 
+@router.post("/matches")
+def create_knockout_match(
+    body: CreateMatchBody,
+    _: dict = Depends(get_admin_user),
+):
+    """Create a new knockout match manually (teams known after group stage)."""
+    row = {
+        "stage":      body.stage,
+        "match_date": body.match_date,
+        "team_a":     body.team_a,
+        "team_b":     body.team_b,
+        "venue":      body.venue,
+        "status":     "NS",
+        "score_a":    None,
+        "score_b":    None,
+        "api_id":     None,
+    }
+    result = supabase.table("matches").insert(row).execute()
+    return result.data[0]
+
+
 @router.patch("/matches/{match_id}/score")
 def set_match_score(
     match_id: str,
@@ -47,14 +76,12 @@ def set_match_score(
     Set the final score for a match and auto-score all predictions.
     Use the match UUID (id field, not api_id).
     """
-    # Update match score and mark as finished
     supabase.table("matches").update({
         "score_a": body.score_a,
         "score_b": body.score_b,
         "status":  "FT",
     }).eq("id", match_id).execute()
 
-    # Auto-score all predictions for this match
     preds = (
         supabase.table("predictions")
         .select("id, score_a, score_b")
@@ -92,6 +119,16 @@ def update_match(
 
     supabase.table("matches").update(updates).eq("id", match_id).execute()
     return {"match_id": match_id, "updated": updates}
+
+
+@router.delete("/matches/{match_id}", status_code=204)
+def delete_match(
+    match_id: str,
+    _: dict = Depends(get_admin_user),
+):
+    """Delete a knockout match and its predictions."""
+    supabase.table("predictions").delete().eq("match_id", match_id).execute()
+    supabase.table("matches").delete().eq("id", match_id).execute()
 
 
 @router.get("/stats")

@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { LogOut } from "lucide-react";
+import { LogOut, Settings } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 export function Navbar() {
@@ -16,16 +16,24 @@ export function Navbar() {
           <span className="text-2xl">⚽</span>
           <span className="font-display text-3xl text-floodlight tracking-wider">KICKOFF</span>
         </Link>
+
         <nav className="hidden md:flex items-center gap-1">
           <NavLink to="/schedule" label="Schedule" />
           <NavLink to="/ranking" label="Ranking" />
           <NavLink to="/profile" label="Profile" />
+          {user?.is_admin && <AdminNavLink />}
         </nav>
+
         <div className="flex items-center gap-3">
           {user && (
             <div className="hidden sm:flex items-center gap-2 text-sm text-chalk-dim">
               <span className="text-xl">{user.avatar}</span>
               <span className="text-chalk">{user.username}</span>
+              {user.is_admin && (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-crowd/20 text-crowd border border-crowd/40">
+                  admin
+                </span>
+              )}
             </div>
           )}
           <button
@@ -57,15 +65,29 @@ function NavLink({
   );
 }
 
-export function BottomNav() {
+function AdminNavLink() {
+  return (
+    <Link
+      to="/admin"
+      className="relative ml-2 px-4 py-2 font-display text-xl tracking-wider text-crowd/80 hover:text-crowd transition data-[status=active]:text-crowd data-[status=active]:border-b-2 data-[status=active]:border-crowd inline-flex items-center gap-1.5"
+    >
+      <Settings className="size-4" />
+      Admin
+      {/* pulsing dot */}
+      <span className="absolute top-1.5 right-1 size-1.5 rounded-full bg-crowd animate-pulse" />
+    </Link>
+  );
+}
+
+export function BottomNav({ isAdmin }: { isAdmin?: boolean }) {
   return (
     <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-turf-mid border-t border-turf-line">
-      <div className="grid grid-cols-3">
+      <div className={`grid ${isAdmin ? "grid-cols-4" : "grid-cols-3"}`}>
         {(
           [
             { to: "/schedule", label: "Schedule" },
-            { to: "/ranking", label: "Ranking" },
-            { to: "/profile", label: "Profile" },
+            { to: "/ranking",  label: "Ranking"  },
+            { to: "/profile",  label: "Profile"  },
           ] as const
         ).map((it) => (
           <Link
@@ -76,6 +98,14 @@ export function BottomNav() {
             {it.label}
           </Link>
         ))}
+        {isAdmin && (
+          <Link
+            to="/admin"
+            className="py-3 text-center font-display tracking-wider text-crowd/70 data-[status=active]:text-crowd"
+          >
+            ⚙️
+          </Link>
+        )}
       </div>
     </nav>
   );
